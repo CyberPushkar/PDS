@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PUSHKAR DIGITAL SOLUTIONS - A4 Document Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #0f172a;
+      color: #334155;
+    }
+
+    /* Standard A4 Physical Dimensions: 210mm x 297mm */
+    .a4-page {
+      width: 210mm;
+      height: 297mm;
+      background: #ffffff;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      margin: 0 auto 25px auto;
+      padding: 12mm 15mm;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* Standard Cut Box for Card Layout Output */
+    .card-cut-box {
+      border: 1px dashed #64748b;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      background-color: #f8fafc;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.2s ease;
+    }
+
+    .card-cut-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: fill; /* Auto-scale freeform crop to fill exact target card box size */
+      display: block;
+      pointer-events: none;
+    }
+
+    .draggable-card-set {
+      cursor: grab;
+      user-select: none;
+    }
+    .draggable-card-set.dragging {
+      opacity: 0.4;
+      cursor: grabbing;
+    }
+    .draggable-card-set.drag-over {
+      outline: 2px dashed #6366f1;
+      outline-offset: 4px;
+      border-radius: 8px;
+    }
+
+    /* ABSOLUTE PRINT PROTECTION - ONLY ACTUAL UPLOADED DOCUMENTS PRINT */
+    @media print {
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .no-print, header, aside, .modal-backdrop, #cropModal, button, .action-overlay, .ui-label {
+        display: none !important;
+        visibility: hidden !important;
+      }
+      .print-wrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+      }
+      .a4-page {
+        box-shadow: none !important;
+        margin: 0 !important;
+        width: 210mm !important;
+        height: 297mm !important;
+        padding: 10mm 15mm !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        border: none !important;
+      }
+      /* Remove border dashed style in print if box is empty */
+      .card-cut-box {
+        box-shadow: none !important;
+      }
+      .card-cut-box:empty {
+        display: none !important;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Main Branding Header: PUSHKAR DIGITAL SOLUTIONS (UI ONLY, NO-PRINT) -->
+  <header class="no-print bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-xl">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-xl font-black w-10 h-10 flex items-center justify-center text-xl shadow-lg border border-indigo-400/30">
+          P
+        </div>
+        <div>
+          <h1 class="font-extrabold text-lg md:text-xl tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-200">
+            PUSHKAR DIGITAL SOLUTIONS
+          </h1>
+          <p class="text-[11px] text-indigo-400 font-medium">A4 Document Layout & Swap Layer Studio</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="triggerFileInput()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-md hover:shadow-indigo-500/20">
+          <span>➕ Document Upload Karein</span>
+        </button>
+        <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-md hover:shadow-emerald-500/20">
+          <span>🖨️ Print Sheet (A4)</span>
+        </button>
+        <button onclick="removeAllCards()" class="bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs md:text-sm px-3 py-2 rounded-lg transition-all">
+          🗑️ Clear All
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Body Layout -->
+  <div class="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950">
+
+    <!-- Sidebar Control Panel -->
+    <aside class="no-print w-full md:w-80 bg-slate-900 border-r border-slate-800 p-4 overflow-y-auto text-slate-200 space-y-5">
+      
+      <!-- Preset Dimension Switcher -->
+      <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60 space-y-3">
+        <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">📐 Card Size Settings</h2>
+        
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Preset Size (साइज़ चुनें):</label>
+          <select id="sizePreset" onchange="applyPresetSize()" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-indigo-500">
+            <option value="custom22" selected>Wide Format / Full (22.0 cm x 8.0 cm)</option>
+            <option value="aadhaar">Govt ID / Aadhaar (8.5 cm x 5.4 cm)</option>
+            <option value="pan">PAN Card (8.6 cm x 5.4 cm)</option>
+            <option value="custom">Custom Dimensions</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Width (चौड़ाई cm)</label>
+            <input type="number" id="cardWidth" value="22.0" step="0.1" min="1" max="22" onchange="renderA4Pages()" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Height (ऊंचाई cm)</label>
+            <input type="number" id="cardHeight" value="8.0" step="0.1" min="1" max="25" onchange="renderA4Pages()" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+          </div>
+        </div>
+      </div>
+
+      <!-- Spacing and Gap Controls -->
+      <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60 space-y-3">
+        <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">📏 Spacing & Printing Borders</h2>
+
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Front & Back Gap (गैप cm)</label>
+          <input type="number" id="pairGap" value="0.8" step="0.1" min="0" max="5" onchange="renderA4Pages()" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+        </div>
+
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Between Sets Gap (सेट गैप cm)</label>
+          <input type="number" id="setGap" value="1.2" step="0.1" min="0" max="10" onchange="renderA4Pages()" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-1.5 text-white">
+        </div>
+
+        <div class="pt-2 space-y-2">
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <input type="checkbox" id="showBorders" checked onchange="renderA4Pages()" class="rounded accent-indigo-600">
+            <span>Show Cutting Dash Lines (कटिंग बॉर्डर)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Card Management Sidebar List -->
+      <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">📑 Documents List (<span id="totalCardsCounter">0</span>)</h2>
+          <button onclick="triggerFileInput()" class="text-[11px] text-indigo-400 hover:underline font-semibold">+ Add Photos</button>
+        </div>
+        <p class="text-[10px] text-slate-400">💡 Kisi bhi card ka Front aur Back upar-neeche swap karne ke liye <b>🔄 Swap</b> button dabayein!</p>
+        <div id="cardsListSidebar" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+          <!-- Dynamic cards list -->
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Main Workspace / A4 Preview Container -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center bg-slate-950 print-wrapper">
+      
+      <!-- Hidden File Input -->
+      <input type="file" id="multiFileInput" multiple accept="image/*" onchange="handleFileInput(event)" class="hidden">
+
+      <!-- Dynamic Page Container -->
+      <div id="a4Container" class="w-full flex flex-col items-center">
+        <!-- A4 Page canvases render dynamically here -->
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Freeform Interactive Crop Modal -->
+  <div id="cropModal" class="no-print fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden flex flex-col">
+    <div class="bg-slate-900 text-white p-3.5 border-b border-slate-800 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <span id="cropSideLabel" class="bg-indigo-600 text-xs px-2.5 py-1 rounded font-bold uppercase">Front Side</span>
+        <h3 class="text-sm font-semibold">Freeform Crop Tool (फ्री क्रॉपिंग टूल)</h3>
+      </div>
+      <button onclick="closeCropModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+    </div>
+
+    <!-- Cropper Canvas Area -->
+    <div class="flex-1 p-4 flex items-center justify-center overflow-hidden bg-black/60 relative">
+      <div class="relative max-w-full max-h-full flex items-center justify-center">
+        <canvas id="cropCanvas" class="max-w-full max-h-[65vh] border border-slate-700 shadow-2xl rounded cursor-crosshair"></canvas>
+      </div>
+    </div>
+
+    <!-- Cropper Controls -->
+    <div class="bg-slate-900 p-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <button onclick="rotateCropCanvas(-90)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-white rounded">↺ Rotate Left</button>
+        <button onclick="rotateCropCanvas(90)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-white rounded">↻ Rotate Right</button>
+        <button onclick="resetCropSelection()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-amber-400 rounded">Reset Selection</button>
+      </div>
+
+      <div class="text-xs text-slate-400 hidden md:block">
+        💡 Corner handles drag karke crop box adjust karein.
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="closeCropModal()" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
+        <button onclick="applyCanvasCrop()" class="px-5 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-md">
+          ✓ Cut & Auto-Fit to A4 Page
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    // Global Application State
+    let documentSets = []; // Array of objects: { id, frontSrc, backSrc }
+    let activeCropIndex = null;
+    let activeCropSide = null;
+    let draggedSetIndex = null;
+
+    // Custom Cropper Canvas State (Freeform Cropper)
+    let originalImage = new Image();
+    let cropCanvas, cropCtx;
+    let cropBox = { x: 20, y: 20, width: 200, height: 150 };
+    let isDraggingBox = false;
+    let activeHandle = null;
+    let dragStart = { x: 0, y: 0 };
+    let rotationAngle = 0;
+
+    window.onload = function() {
+      cropCanvas = document.getElementById('cropCanvas');
+      cropCtx = cropCanvas.getContext('2d');
+      setupCropEvents();
+      // CLEAN START: No default dummy placeholders loaded to avoid print clutter!
+      renderA4Pages();
+    };
+
+    function triggerFileInput() {
+      document.getElementById('multiFileInput').click();
+    }
+
+    // Offline FileReader API
+    function handleFileInput(event) {
+      const files = Array.from(event.target.files);
+      if (files.length === 0) return;
+
+      let loadedImages = [];
+      let processed = 0;
+
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          loadedImages.push(e.target.result);
+          processed++;
+
+          if (processed === files.length) {
+            for (let i = 0; i < loadedImages.length; i += 2) {
+              const front = loadedImages[i];
+              const back = loadedImages[i + 1] || loadedImages[i];
+              documentSets.push({
+                id: Date.now() + i + Math.random(),
+                frontSrc: front,
+                backSrc: back
+              });
+            }
+            renderA4Pages();
+            event.target.value = '';
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // DIRECT SWAP FUNCTION: Swaps Front side and Back side position immediately
+    function swapFrontAndBack(index) {
+      if (index < 0 || index >= documentSets.length) return;
+      const temp = documentSets[index].frontSrc;
+      documentSets[index].frontSrc = documentSets[index].backSrc;
+      documentSets[index].backSrc = temp;
+      renderA4Pages();
+    }
+
+    function moveCardUp(index) {
+      if (index <= 0) return;
+      const temp = documentSets[index];
+      documentSets[index] = documentSets[index - 1];
+      documentSets[index - 1] = temp;
+      renderA4Pages();
+    }
+
+    function moveCardDown(index) {
+      if (index < 0 || index >= documentSets.length - 1) return;
+      const temp = documentSets[index];
+      documentSets[index] = documentSets[index + 1];
+      documentSets[index + 1] = temp;
+      renderA4Pages();
+    }
+
+    function removeCard(index) {
+      documentSets.splice(index, 1);
+      renderA4Pages();
+    }
+
+    function removeAllCards() {
+      if (documentSets.length === 0) return;
+      if (confirm("Kya aap sabhi uploaded documents hatana chahte hain?")) {
+        documentSets = [];
+        renderA4Pages();
+      }
+    }
+
+    function applyPresetSize() {
+      const preset = document.getElementById('sizePreset').value;
+      if (preset === 'custom22') {
+        document.getElementById('cardWidth').value = 22.0;
+        document.getElementById('cardHeight').value = 8.0;
+      } else if (preset === 'aadhaar') {
+        document.getElementById('cardWidth').value = 8.5;
+        document.getElementById('cardHeight').value = 5.4;
+      } else if (preset === 'pan') {
+        document.getElementById('cardWidth').value = 8.6;
+        document.getElementById('cardHeight').value = 5.4;
+      }
+      renderA4Pages();
+    }
+
+    function renderA4Pages() {
+      const container = document.getElementById('a4Container');
+      container.innerHTML = '';
+
+      document.getElementById('totalCardsCounter').innerText = documentSets.length;
+      updateSidebarList();
+
+      if (documentSets.length === 0) {
+        container.innerHTML = `
+          <div class="no-print bg-slate-900 border border-slate-800 p-10 rounded-2xl text-center max-w-md my-12 text-slate-300">
+            <div class="text-4xl mb-3">📁</div>
+            <h3 class="font-bold text-white text-base mb-1">Koi Document Selected Nahi Hai</h3>
+            <p class="text-xs text-slate-400 mb-5">Aadhaar / ID Card ki Front aur Back photos upload karein. Print sheet pure aur saaf dikhegi.</p>
+            <button onclick="triggerFileInput()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg shadow-md">
+              + Customer Photos Upload Karein
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Exact Dimensions in Centimeters
+      const cardW = parseFloat(document.getElementById('cardWidth').value) || 22.0;
+      const cardH = parseFloat(document.getElementById('cardHeight').value) || 8.0;
+      const pairGap = parseFloat(document.getElementById('pairGap').value) || 0.8;
+      const setGap = parseFloat(document.getElementById('setGap').value) || 1.2;
+      const showBorders = document.getElementById('showBorders').checked;
+
+      const maxPageHeightCm = 27.0;
+
+      let currentPage = createNewA4Page();
+      let currentUsedHeight = 0;
+      container.appendChild(currentPage);
+
+      documentSets.forEach((doc, index) => {
+        const pairHeightCm = (cardH * 2) + pairGap;
+
+        if (currentUsedHeight > 0 && (currentUsedHeight + setGap + pairHeightCm) > maxPageHeightCm) {
+          currentPage = createNewA4Page();
+          container.appendChild(currentPage);
+          currentUsedHeight = 0;
+        }
+
+        // Draggable Document Set Container
+        const setWrapper = document.createElement('div');
+        setWrapper.className = 'card-set-pair draggable-card-set relative group flex flex-col items-center';
+        setWrapper.style.marginBottom = `${setGap}cm`;
+        setWrapper.setAttribute('draggable', 'true');
+        setWrapper.setAttribute('data-index', index);
+
+        setWrapper.addEventListener('dragstart', (e) => handleDragStart(e, index));
+        setWrapper.addEventListener('dragover', (e) => handleDragOver(e, setWrapper));
+        setWrapper.addEventListener('dragleave', () => setWrapper.classList.remove('drag-over'));
+        setWrapper.addEventListener('drop', (e) => handleDrop(e, index));
+
+        // Quick Swap Bar Above Front Box (UI ONLY - NO PRINT)
+        const topBar = document.createElement('div');
+        topBar.className = 'no-print w-full flex items-center justify-between mb-1 text-[11px] bg-slate-900/90 border border-slate-700/80 px-3 py-1 rounded-lg text-slate-300';
+        topBar.innerHTML = `
+          <span class="font-bold text-indigo-400">Card Set #${index + 1}</span>
+          <div class="flex items-center gap-2">
+            <button onclick="swapFrontAndBack(${index})" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2 py-0.5 rounded flex items-center gap-1 shadow">
+              <span>🔄</span> Swap Front/Back (ऊपर ↔ नीचे)
+            </button>
+            <button onclick="openCropper(${index}, 'front')" class="bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded">✂️ Front Crop</button>
+            <button onclick="openCropper(${index}, 'back')" class="bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded">✂️ Back Crop</button>
+            <button onclick="removeCard(${index})" class="text-rose-400 hover:text-rose-200 ml-1">✕</button>
+          </div>
+        `;
+
+        // Front Card Box
+        const frontBox = document.createElement('div');
+        frontBox.className = 'card-cut-box';
+        frontBox.style.width = `${cardW}cm`;
+        frontBox.style.height = `${cardH}cm`;
+        if (!showBorders) frontBox.style.border = 'none';
+
+        if (doc.frontSrc) {
+          const frontImg = document.createElement('img');
+          frontImg.src = doc.frontSrc;
+          frontBox.appendChild(frontImg);
+        }
+
+        // Back Card Box
+        const backBox = document.createElement('div');
+        backBox.className = 'card-cut-box';
+        backBox.style.width = `${cardW}cm`;
+        backBox.style.height = `${cardH}cm`;
+        backBox.style.marginTop = `${pairGap}cm`;
+        if (!showBorders) backBox.style.border = 'none';
+
+        if (doc.backSrc) {
+          const backImg = document.createElement('img');
+          backImg.src = doc.backSrc;
+          backBox.appendChild(backImg);
+        }
+
+        setWrapper.appendChild(topBar);
+        setWrapper.appendChild(frontBox);
+        setWrapper.appendChild(backBox);
+
+        currentPage.appendChild(setWrapper);
+        currentUsedHeight += pairHeightCm + setGap;
+      });
+    }
+
+    function createNewA4Page() {
+      const page = document.createElement('div');
+      page.className = 'a4-page';
+      return page;
+    }
+
+    function handleDragStart(e, index) {
+      draggedSetIndex = index;
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragOver(e, element) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      element.classList.add('drag-over');
+    }
+
+    function handleDrop(e, targetIndex) {
+      e.preventDefault();
+      if (draggedSetIndex !== null && draggedSetIndex !== targetIndex) {
+        const movedItem = documentSets.splice(draggedSetIndex, 1)[0];
+        documentSets.splice(targetIndex, 0, movedItem);
+        renderA4Pages();
+      }
+      draggedSetIndex = null;
+    }
+
+    function updateSidebarList() {
+      const list = document.getElementById('cardsListSidebar');
+      list.innerHTML = '';
+
+      documentSets.forEach((doc, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2 bg-slate-900/80 border border-slate-700/60 rounded-lg text-xs text-slate-300';
+        item.innerHTML = `
+          <div class="flex items-center gap-2 overflow-hidden">
+            <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">#${idx + 1}</span>
+            ${doc.frontSrc ? `<img src="${doc.frontSrc}" class="w-8 h-5 object-cover rounded border border-slate-700">` : ''}
+            <span class="truncate font-medium text-[11px]">Set #${idx + 1}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="swapFrontAndBack(${idx})" title="Swap Front & Back" class="bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded text-[10px] font-bold">🔄 Swap</button>
+            <button onclick="removeCard(${idx})" title="Remove" class="hover:text-rose-400 p-1 text-xs">✕</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function openCropper(index, side) {
+      activeCropIndex = index;
+      activeCropSide = side;
+
+      const card = documentSets[index];
+      const imageSrc = side === 'front' ? card.frontSrc : card.backSrc;
+
+      if (!imageSrc) return;
+
+      document.getElementById('cropSideLabel').innerText = side === 'front' ? 'Front Side Free Crop' : 'Back Side Free Crop';
+      
+      originalImage = new Image();
+      originalImage.onload = function() {
+        rotationAngle = 0;
+        setupCanvasSize();
+        resetCropSelection();
+        drawCropCanvas();
+        document.getElementById('cropModal').classList.remove('hidden');
+      };
+      originalImage.src = imageSrc;
+    }
+
+    function setupCanvasSize() {
+      const maxW = Math.min(window.innerWidth * 0.8, 700);
+      const maxH = Math.min(window.innerHeight * 0.55, 450);
+
+      let w = originalImage.width;
+      let h = originalImage.height;
+
+      const ratio = Math.min(maxW / w, maxH / h);
+      cropCanvas.width = w * ratio;
+      cropCanvas.height = h * ratio;
+    }
+
+    function resetCropSelection() {
+      cropBox = {
+        x: cropCanvas.width * 0.05,
+        y: cropCanvas.height * 0.05,
+        width: cropCanvas.width * 0.9,
+        height: cropCanvas.height * 0.9
+      };
+      drawCropCanvas();
+    }
+
+    function rotateCropCanvas(deg) {
+      rotationAngle = (rotationAngle + deg) % 360;
+      drawCropCanvas();
+    }
+
+    function drawCropCanvas() {
+      cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+
+      cropCtx.save();
+      if (rotationAngle !== 0) {
+        cropCtx.translate(cropCanvas.width / 2, cropCanvas.height / 2);
+        cropCtx.rotate((rotationAngle * Math.PI) / 180);
+        cropCtx.drawImage(originalImage, -cropCanvas.width / 2, -cropCanvas.height / 2, cropCanvas.width, cropCanvas.height);
+      } else {
+        cropCtx.drawImage(originalImage, 0, 0, cropCanvas.width, cropCanvas.height);
+      }
+      cropCtx.restore();
+
+      cropCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      cropCtx.fillRect(0, 0, cropCanvas.width, cropBox.y);
+      cropCtx.fillRect(0, cropBox.y, cropBox.x, cropBox.height);
+      cropCtx.fillRect(cropBox.x + cropBox.width, cropBox.y, cropCanvas.width - (cropBox.x + cropBox.width), cropBox.height);
+      cropCtx.fillRect(0, cropBox.y + cropBox.height, cropCanvas.width, cropCanvas.height - (cropBox.y + cropBox.height));
+
+      cropCtx.strokeStyle = '#38bdf8';
+      cropCtx.lineWidth = 2;
+      cropCtx.setLineDash([4, 4]);
+      cropCtx.strokeRect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
+      cropCtx.setLineDash([]);
+
+      drawHandle(cropBox.x, cropBox.y);
+      drawHandle(cropBox.x + cropBox.width, cropBox.y);
+      drawHandle(cropBox.x, cropBox.y + cropBox.height);
+      drawHandle(cropBox.x + cropBox.width, cropBox.y + cropBox.height);
+    }
+
+    function drawHandle(x, y) {
+      cropCtx.fillStyle = '#38bdf8';
+      cropCtx.strokeStyle = '#ffffff';
+      cropCtx.lineWidth = 2;
+      cropCtx.beginPath();
+      cropCtx.arc(x, y, 7, 0, Math.PI * 2);
+      cropCtx.fill();
+      cropCtx.stroke();
+    }
+
+    function setupCropEvents() {
+      const handleRadius = 12;
+
+      cropCanvas.addEventListener('mousedown', (e) => {
+        const rect = cropCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        if (Math.hypot(mouseX - cropBox.x, mouseY - cropBox.y) < handleRadius) {
+          activeHandle = 'tl';
+        } else if (Math.hypot(mouseX - (cropBox.x + cropBox.width), mouseY - cropBox.y) < handleRadius) {
+          activeHandle = 'tr';
+        } else if (Math.hypot(mouseX - cropBox.x, mouseY - (cropBox.y + cropBox.height)) < handleRadius) {
+          activeHandle = 'bl';
+        } else if (Math.hypot(mouseX - (cropBox.x + cropBox.width), mouseY - (cropBox.y + cropBox.height)) < handleRadius) {
+          activeHandle = 'br';
+        } else if (mouseX >= cropBox.x && mouseX <= cropBox.x + cropBox.width &&
+                   mouseY >= cropBox.y && mouseY <= cropBox.y + cropBox.height) {
+          activeHandle = 'center';
+          dragStart = { x: mouseX - cropBox.x, y: mouseY - cropBox.y };
+        } else {
+          activeHandle = null;
+        }
+
+        if (activeHandle) isDraggingBox = true;
+      });
+
+      cropCanvas.addEventListener('mousemove', (e) => {
+        if (!isDraggingBox) return;
+        const rect = cropCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const minSize = 20;
+
+        if (activeHandle === 'center') {
+          let newX = mouseX - dragStart.x;
+          let newY = mouseY - dragStart.y;
+          newX = Math.max(0, Math.min(newX, cropCanvas.width - cropBox.width));
+          newY = Math.max(0, Math.min(newY, cropCanvas.height - cropBox.height));
+          cropBox.x = newX;
+          cropBox.y = newY;
+        } else if (activeHandle === 'tl') {
+          const newW = (cropBox.x + cropBox.width) - mouseX;
+          const newH = (cropBox.y + cropBox.height) - mouseY;
+          if (newW > minSize && mouseX >= 0) { cropBox.width = newW; cropBox.x = mouseX; }
+          if (newH > minSize && mouseY >= 0) { cropBox.height = newH; cropBox.y = mouseY; }
+        } else if (activeHandle === 'tr') {
+          const newW = mouseX - cropBox.x;
+          const newH = (cropBox.y + cropBox.height) - mouseY;
+          if (newW > minSize && mouseX <= cropCanvas.width) { cropBox.width = newW; }
+          if (newH > minSize && mouseY >= 0) { cropBox.height = newH; cropBox.y = mouseY; }
+        } else if (activeHandle === 'bl') {
+          const newW = (cropBox.x + cropBox.width) - mouseX;
+          const newH = mouseY - cropBox.y;
+          if (newW > minSize && mouseX >= 0) { cropBox.width = newW; cropBox.x = mouseX; }
+          if (newH > minSize && mouseY <= cropCanvas.height) { cropBox.height = newH; }
+        } else if (activeHandle === 'br') {
+          const newW = mouseX - cropBox.x;
+          const newH = mouseY - cropBox.y;
+          if (newW > minSize && mouseX <= cropCanvas.width) { cropBox.width = newW; }
+          if (newH > minSize && mouseY <= cropCanvas.height) { cropBox.height = newH; }
+        }
+
+        drawCropCanvas();
+      });
+
+      window.addEventListener('mouseup', () => { 
+        isDraggingBox = false; 
+        activeHandle = null;
+      });
+    }
+
+    function applyCanvasCrop() {
+      const scaleX = originalImage.width / cropCanvas.width;
+      const scaleY = originalImage.height / cropCanvas.height;
+
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = Math.max(1, cropBox.width * scaleX);
+      outCanvas.height = Math.max(1, cropBox.height * scaleY);
+      const outCtx = outCanvas.getContext('2d');
+
+      outCtx.drawImage(
+        originalImage,
+        cropBox.x * scaleX,
+        cropBox.y * scaleY,
+        cropBox.width * scaleX,
+        cropBox.height * scaleY,
+        0, 0,
+        outCanvas.width,
+        outCanvas.height
+      );
+
+      const croppedDataUrl = outCanvas.toDataURL('image/jpeg', 0.95);
+
+      if (activeCropSide === 'front') {
+        documentSets[activeCropIndex].frontSrc = croppedDataUrl;
+      } else {
+        documentSets[activeCropIndex].backSrc = croppedDataUrl;
+      }
+
+      closeCropModal();
+      renderA4Pages();
+    }
+
+    function closeCropModal() {
+      document.getElementById('cropModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
