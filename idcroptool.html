@@ -369,8 +369,8 @@
     function applyPresetSize() {
       const preset = document.getElementById('sizePreset').value;
       if (preset === 'custom22') {
-        document.getElementById('cardWidth').value = 22.0;
-        document.getElementById('cardHeight').value = 8.0;
+        document.getElementById('cardWidth').value = 10.0;
+        document.getElementById('cardHeight').value = 7.0;
       } else if (preset === 'aadhaar') {
         document.getElementById('cardWidth').value = 8.5;
         document.getElementById('cardHeight').value = 5.4;
@@ -403,8 +403,8 @@
       }
 
       // Exact Dimensions in Centimeters
-      const cardW = parseFloat(document.getElementById('cardWidth').value) || 22.0;
-      const cardH = parseFloat(document.getElementById('cardHeight').value) || 8.0;
+      const cardW = parseFloat(document.getElementById('cardWidth').value) || 10.0;
+      const cardH = parseFloat(document.getElementById('cardHeight').value) || 7.0;
       const pairGap = parseFloat(document.getElementById('pairGap').value) || 0.8;
       const setGap = parseFloat(document.getElementById('setGap').value) || 1.2;
       const showBorders = document.getElementById('showBorders').checked;
